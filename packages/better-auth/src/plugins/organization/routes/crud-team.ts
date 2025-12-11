@@ -890,7 +890,7 @@ export const listTeamMembers = <O extends OrganizationOptions>(options: O) =>
 		},
 		async (ctx) => {
 			const session = ctx.context.session;
-			const adapter = getOrgAdapter(ctx.context, ctx.context.orgOptions);
+			const adapter = getOrgAdapter<O>(ctx.context, options);
 			const teamId = ctx.query?.teamId || session?.session.activeTeamId;
 			if (!teamId) {
 				throw APIError.from(
@@ -935,13 +935,25 @@ const addTeamMemberBodySchema = z.object({
 		.optional(),
 });
 
-export const addTeamMember = <O extends OrganizationOptions>(options: O) =>
-	createAuthEndpoint(
+export const addTeamMember = <O extends OrganizationOptions>(options: O) => {
+	const additionalFieldsSchema = toZodSchema({
+		fields: options?.schema?.teamMember?.additionalFields ?? {},
+		isClientSide: true,
+	});
+
+	return createAuthEndpoint(
 		"/organization/add-team-member",
 		{
 			method: "POST",
-			body: addTeamMemberBodySchema,
+			body: z.object({
+				...addTeamMemberBodySchema.shape,
+				...additionalFieldsSchema.shape,
+			}),
 			metadata: {
+				$Infer: {
+					body: {} as z.infer<typeof addTeamMemberBodySchema> &
+						InferAdditionalFieldsFromPluginOptions<"teamMember", O>,
+				},
 				openapi: {
 					description: "The newly created member",
 					responses: {
@@ -986,7 +998,7 @@ export const addTeamMember = <O extends OrganizationOptions>(options: O) =>
 		},
 		async (ctx) => {
 			const session = ctx.context.session;
-			const adapter = getOrgAdapter(ctx.context, ctx.context.orgOptions);
+			const adapter = getOrgAdapter<O>(ctx.context, options);
 
 			const organizationId =
 				ctx.body.organizationId || session.session.activeOrganizationId;
@@ -1070,26 +1082,32 @@ export const addTeamMember = <O extends OrganizationOptions>(options: O) =>
 				});
 			}
 
+			const { teamId, userId, ...additionalFields } = ctx.body;
+
+			let teamMemberData = {
+				teamId,
+				userId,
+				...additionalFields,
+			};
+
 			// Run beforeAddTeamMember hook
 			if (options?.organizationHooks?.beforeAddTeamMember) {
 				const response = await options?.organizationHooks.beforeAddTeamMember({
-					teamMember: {
-						teamId: ctx.body.teamId,
-						userId: ctx.body.userId,
-					},
+					teamMember: teamMemberData,
 					team,
 					user: userBeingAdded,
 					organization,
 				});
 				if (response && typeof response === "object" && "data" in response) {
 					// Allow the hook to modify the data
+					teamMemberData = {
+						...teamMemberData,
+						...response.data,
+					};
 				}
 			}
 
-			const teamMember = await adapter.findOrCreateTeamMember({
-				teamId: ctx.body.teamId,
-				userId: ctx.body.userId,
-			});
+			const teamMember = await adapter.findOrCreateTeamMember(teamMemberData);
 
 			// Run afterAddTeamMember hook
 			if (options?.organizationHooks?.afterAddTeamMember) {
@@ -1104,6 +1122,7 @@ export const addTeamMember = <O extends OrganizationOptions>(options: O) =>
 			return ctx.json(teamMember);
 		},
 	);
+};
 
 const removeTeamMemberBodySchema = z.object({
 	teamId: z.string().meta({

@@ -63,8 +63,8 @@ import type {
 	InferMember,
 	InferOrganization,
 	InferTeam,
+	InferTeamMember,
 	OrganizationSchema,
-	TeamMember,
 } from "./schema";
 import type { OrganizationOptions } from "./types";
 
@@ -91,7 +91,9 @@ export type DefaultOrganizationPlugin<Options extends OrganizationOptions> = {
 		Team: Options["teams"] extends { enabled: true }
 			? InferTeam<Options>
 			: never;
-		TeamMember: Options["teams"] extends { enabled: true } ? TeamMember : never;
+		TeamMember: Options["teams"] extends { enabled: true }
+			? InferTeamMember<Options>
+			: never;
 		ActiveOrganization: Options["teams"] extends { enabled: true }
 			? {
 					members: InferMember<Options, false>[];
@@ -305,7 +307,7 @@ export type OrganizationPlugin<O extends OrganizationOptions> = {
 		Invitation: InferInvitation<O>;
 		Member: InferMember<O>;
 		Team: O["teams"] extends { enabled: true } ? InferTeam<O> : never;
-		TeamMember: O["teams"] extends { enabled: true } ? TeamMember : never;
+		TeamMember: O["teams"] extends { enabled: true } ? InferTeamMember<O> : never;
 		ActiveOrganization: O["teams"] extends { enabled: true }
 			? {
 					members: InferMember<O, false>[];
@@ -357,7 +359,7 @@ export function organization<
 		Invitation: InferInvitation<O>;
 		Member: InferMember<O>;
 		Team: O["teams"] extends { enabled: true } ? InferTeam<O> : never;
-		TeamMember: O["teams"] extends { enabled: true } ? TeamMember : never;
+		TeamMember: O["teams"] extends { enabled: true } ? InferTeamMember<O> : never;
 		ActiveOrganization: O["teams"] extends { enabled: true }
 			? {
 					members: InferMember<O, false>[];
@@ -391,7 +393,7 @@ export function organization<
 		Invitation: InferInvitation<O>;
 		Member: InferMember<O>;
 		Team: O["teams"] extends { enabled: true } ? InferTeam<O> : never;
-		TeamMember: O["teams"] extends { enabled: true } ? TeamMember : never;
+		TeamMember: O["teams"] extends { enabled: true } ? InferTeamMember<O> : never;
 		ActiveOrganization: O["teams"] extends { enabled: true }
 			? {
 					members: InferMember<O, false>[];
@@ -423,7 +425,7 @@ export function organization<
 		Invitation: InferInvitation<O>;
 		Member: InferMember<O>;
 		Team: O["teams"] extends { enabled: true } ? InferTeam<O> : never;
-		TeamMember: O["teams"] extends { enabled: true } ? TeamMember : never;
+		TeamMember: O["teams"] extends { enabled: true } ? InferTeamMember<O> : never;
 		ActiveOrganization: O["teams"] extends { enabled: true }
 			? {
 					members: InferMember<O, false>[];
@@ -997,6 +999,7 @@ export function organization<O extends OrganizationOptions>(options?: O) {
 							required: false,
 							fieldName: opts.schema?.teamMember?.fields?.createdAt,
 						},
+						...(opts.schema?.teamMember?.additionalFields || {}),
 					},
 				},
 			} satisfies BetterAuthPluginDBSchema)
@@ -1258,7 +1261,7 @@ export function organization<O extends OrganizationOptions>(options?: O) {
 			Invitation: {} as InferInvitation<O>,
 			Member: {} as InferMember<O>,
 			Team: teamSupport ? ({} as InferTeam<O>) : ({} as never),
-			TeamMember: teamSupport ? ({} as TeamMember) : ({} as never),
+			TeamMember: teamSupport ? ({} as InferTeamMember<O>) : ({} as never),
 			ActiveOrganization: {} as O["teams"] extends { enabled: true }
 				? {
 						members: InferMember<O, false>[];
